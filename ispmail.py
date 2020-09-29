@@ -413,7 +413,7 @@ def apache_configs():
    commands2 = ["a2ensite " + hostname +"-http.conf",
    "a2dissite 000-default.conf",
    "systemctl reload apache2",
-   "certbot certonly -n --apache --webroot --webroot-path /var/www/" + hostname+ " -d "+ hostname + " --agree-tos --email " + email,
+   "certbot certonly -n --webroot --webroot-path /var/www/" + hostname+ " -d "+ hostname + " --agree-tos --email " + email,
    ]
    files2 = [(http_conf2_file, http_conf2), 
    (https_conf_file, https_conf),
