@@ -11,7 +11,17 @@ import getpass
 """
 ISPMailInstall Utility
 Implements ISPMail Tutorial of Christoph Haas as in https://workaround.org/ispmail/buster/
-Details are in https://www.karasite.xyz
+Details are in https://www.karasite.xyz or README.MD
+version: 0.1.
+
+Exit Codes:
+0:    Program completed succesfully (Still there might be some errors processing commands)
+1:    Error in config file
+11:   Platform is not Linux
+12:   User is not root or not by sudo
+13:   Platform is not Debian or Ubuntu
+21:   Error creating a log file
+22:   Error adding to log file
 
    ---Copyright (C) Exforge exforge@x386.xyz
    This document is free text: you can redistribute it and/or modify
@@ -60,7 +70,7 @@ def start_log(log_file):
    except Exception as e:
       print("Error creating log file: " + log_file)
       print("Exiting...Error message: " + str(e))
-      exit(111)
+      exit(21)
 
 def add_log(log_file, log):
    """
@@ -74,7 +84,7 @@ def add_log(log_file, log):
    except Exception as e:
       print("Error adding to log file: " + log_file)
       print("Exiting...Error message: " + str(e))
-      exit(112)
+      exit(22)
 
 def process_command(command):
    """
@@ -278,7 +288,7 @@ def read_config_file():
    except Exception as e:
       print("Error in config file " + config_file)
       print(str(e))
-      exit(11)
+      exit(1)
    hostname = config.get("Mail Server", "hostname", fallback="")
    # We may have more than 1 domains, store them in a list
    domains_raw = config.get("Mail Server", "domains", fallback="")
@@ -343,6 +353,7 @@ def generate_auto_passwords():
    if ispmailadminpw == "auto":
       ispmailadminpw = password(12)
       ispmailadminpwauto = True
+   return(0)
 
 def initialize_parameters():
    """
@@ -352,6 +363,7 @@ def initialize_parameters():
    read_config_file()
    get_missing_parameters()
    generate_auto_passwords()
+
 
 def apt_install():
    """
@@ -401,7 +413,7 @@ def apache_configs():
    commands2 = ["a2ensite " + hostname +"-http.conf",
    "a2dissite 000-default.conf",
    "systemctl reload apache2",
-   "certbot certonly -n --webroot --webroot-path /var/www/" + hostname+ " -d "+ hostname + " --agree-tos --email " + email,
+   "certbot certonly -n --apache --webroot --webroot-path /var/www/" + hostname+ " -d "+ hostname + " --agree-tos --email " + email,
    ]
    files2 = [(http_conf2_file, http_conf2), (https_conf_file, https_conf)]
    commands3 = ["a2enmod ssl",
