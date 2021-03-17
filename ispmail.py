@@ -596,7 +596,7 @@ def dkim_config():
 
    # Create Dkim keypairs for all domains
    for domain in domains:
-      command = "rspamadm dkim_keygen -d %domain% -s 20200908 -k /var/lib/rspamd/dkim/" 
+      command = "rspamadm dkim_keygen -d domain -s " + today + " -k /var/lib/rspamd/dkim/" 
       command = command + domain + "." + today + ".key > /tmp/" + domain + ".dkim"
       process_command_wpipe(command)
    
