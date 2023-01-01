@@ -7,12 +7,12 @@ import configparser
 import random
 import string
 import getpass
-
+ 
 """
 ISPMailInstall Utility
 Implements ISPMail Tutorial of Christoph Haas as in https://workaround.org/ispmail/buster/
 Details are in https://www.karasite.xyz or README.MD
-version: 0.1.
+version: 0.2.
 
 Exit Codes:
 0:    Program completed succesfully (Still there might be some errors processing commands)
@@ -23,8 +23,8 @@ Exit Codes:
 21:   Error creating a log file
 22:   Error adding to log file
 
-   ---Copyright (C) Exforge exforge@x386.xyz
-   This document is free text: you can redistribute it and/or modify
+   ---Copyright (C) 2021 - 2023 Exforge exforge@x386.xyz
+   This program is free text: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    any later version.
@@ -35,6 +35,33 @@ Exit Codes:
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
+def distro_version():
+   """ Returns Distro name and version
+   /etc/os-release file contains distro name and release versions among
+   other information. We try to reach the information in the following format:
+   NAME="Ubuntu"
+   VERSION_ID="22.04"
+   Supported distros are: Ubuntu 20.04 and 22.04, Debian GNU/Linux 10 and 11
+   """
+   d = {}
+   try:
+      with open("/etc/os-release") as f:
+         for line in f:
+            # Clear " and Newlines
+            line = line.replace('"', '')          
+            line = line.replace('\n', '')
+            # Skip empty lines
+            if line == "":
+               continue
+            (key, val) = line.split("=")
+            d[(key)] = val
+      distro = d["NAME"]
+      version = d["VERSION_ID"]
+   except:
+      distro = "Other"
+      version = "Other"
+   return distro, version
 
 def find_between(s, first, last):
    """
@@ -618,7 +645,9 @@ def ispmailadmin_config():
    """
    commands = ["mkdir /var/www/ispmailadmin",
    "git clone  -b buster https://gitlab.com/ToKe79/ispmailadmin.git /var/www/ispmailadmin"]
-   
+   # The buster branch is not compatible with PHP 8, so use master branch for Ubuntu 22.04
+   if (distro_release == "Ubuntu22.04"):
+      commands[1] = "git clone  -b master https://gitlab.com/ToKe79/ispmailadmin.git /var/www/ispmailadmin"
    for command in commands:
       process_command(command)
    filename = ispmailadmin_configs_file
@@ -738,6 +767,12 @@ def prepare_autoconfig_files():
       content += "https://" + domain + "/.well-known/autoconfig/mail/config-v1.1.xml \n\n"
    to_file(filename, content)
 
+# Ubuntu 20.04 and Ubuntu 22.04 have some differences in roundcube package (So do Debian 10 
+#   and Debian 11. So we should know if the distro is Ubuntu20, Ubuntu22, Debian11, 
+#   or Debian10). 
+
+supported_releases = ["Ubuntu20.04", "Ubuntu22.04", "Debian GNU/Linux10", "Debian GNU/Linux11"]
+
 
 # Clear all parameters
 hostname = ""
@@ -775,13 +810,22 @@ if euid != 0:
    print("This program must be run by root or with sudo, exiting!")
    exit(12)
 
-# Runs only on Debian amd Ubuntu
+# Runs only on Debian and Ubuntu
 version = platform.version()
 if not (("Ubuntu" in version) or ("Debian" in version)):
    print("This program runs on Debian or Ubuntu only, exiting!")
    exit(13)
 
+# Check releases other than Ubuntu 20.04, 22.04, and Debian 10, 11
 
+distro, release = distro_version()
+distro_release = distro + release
+
+
+if (distro_release not in supported_releases):
+   print("Your version ", distro_release, " is not supported.")
+   print("Press Enter to continue anyway, CTRL-C to exit.")
+   input()
 
 # Get all parameters before initializing all settings
 initialize_parameters()
@@ -808,13 +852,19 @@ http_conf2_file = "/etc/apache2/sites-available/" + hostname + "-http.conf"
 
 # Our main https site config
 # This site includes, roundcube, adminer, rspamd and ispmailadmin interfaces
+
+# In Debian 10 and Ubuntu 20.04, roundcube runtime resides in /var/lib/roundcube
+# In Debian 11 and Ubuntu 22.04, roundcube runtime resides in /var/lib/roundcube/public_html
+roundcube_directory = "/var/lib/roundcube"
+if (distro_release in ["Ubuntu22.04", "Debian GNU/Linux11"]):
+   roundcube_directory = "/var/lib/roundcube/public_html"
 https_conf ="""
 <VirtualHost *:443>
  Alias /adminer /usr/share/adminer/adminer
  Alias /admin /var/www/ispmailadmin
  Include /etc/roundcube/apache.conf
  ServerName """ + hostname + """
- DocumentRoot /var/lib/roundcube
+ DocumentRoot """ + roundcube_directory + """
  SSLEngine on
  SSLCertificateFile /etc/letsencrypt/live/""" + hostname + """/fullchain.pem
  SSLCertificateKeyFile /etc/letsencrypt/live/""" + hostname + """/privkey.pem
@@ -2630,6 +2680,7 @@ define('IMA_CFG_DB_PORT',     '3306');
 define('IMA_CFG_DB_USER',     'mailadmin');
 define('IMA_CFG_DB_PASSWORD', '""" + mailadminpw + """');
 define('IMA_CFG_DB_DATABASE', 'mailserver');
+define('IMA_CFG_DB_SOCKET',   null);
 /**
 ** Pasword hashes
 ** Uncomment to use dovecot/BCRYPT hashes,
@@ -2641,6 +2692,12 @@ define('IMA_CFG_USE_BCRYPT_HASHES', true);
 ** Uncomment to use quota management
 **/
 define('IMA_CFG_QUOTAS', true);
+/// true or false
+define('IMA_CFG_USE_QUOTAS', true);
+/// in bytes. 0 is unlimited, 1GB = 2^30 Bytes = 1073741824
+define('IMA_CFG_DEFAULT_QUOTA', 0);
+/// convenience for input field
+define('IMA_CFG_QUOTA_STEP', 1073741824);
 /**
 ** access control: uncomment the type you want to use.
 **

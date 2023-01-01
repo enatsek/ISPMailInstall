@@ -1,12 +1,12 @@
 # ISPMailInstall
 
-- Multi Domain Mail Server Installation Tool for Debian 10 and Ubuntu 20.04 Linux
+- Multi Domain Mail Server Installation Tool for Debian 10, 11 and Ubuntu 20.04, 22.04 Linux
 
 Totally based on ISPMail Tutorial by Christoph Haas at https://workaround.org/ispmail
 
 ISPMail is a very detailed and intensive tutorial for installing a full featured mail server, prepared by Christoph Haas. You can reach it at at https://workaround.org/ispmail
 
-ISPMailInstall is a Python3 program written by be. It is named ispmail.py. The program is written to implement the tutorial. That means, everything you are expected to do on your server is implemented by the program.
+ISPMailInstall is a Python3 program written by me. It is named ispmail.py. The program is written to implement the tutorial. That means, everything you are expected to do on your server is implemented by the program.
 
 The program needs some parameters to run, they are explained in Technical Details section. There is a ispmail.conf file, which contains the sample configurations. After you change it with your parameters, you can run ispmail.py.
 
