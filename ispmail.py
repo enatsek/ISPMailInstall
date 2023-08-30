@@ -12,7 +12,7 @@ import getpass
 ISPMailInstall Utility
 Implements ISPMail Tutorial of Christoph Haas as in https://workaround.org/ispmail/buster/
 Details are in https://www.karasite.xyz or README.MD
-version: 0.2.
+version: 0.2.1
 
 Exit Codes:
 0:    Program completed succesfully (Still there might be some errors processing commands)
@@ -42,7 +42,7 @@ def distro_version():
    other information. We try to reach the information in the following format:
    NAME="Ubuntu"
    VERSION_ID="22.04"
-   Supported distros are: Ubuntu 20.04 and 22.04, Debian GNU/Linux 10 and 11
+   Supported distros are: Ubuntu 20.04 and 22.04, Debian GNU/Linux 10, 11 12
    """
    d = {}
    try:
@@ -768,10 +768,10 @@ def prepare_autoconfig_files():
    to_file(filename, content)
 
 # Ubuntu 20.04 and Ubuntu 22.04 have some differences in roundcube package (So do Debian 10 
-#   and Debian 11. So we should know if the distro is Ubuntu20, Ubuntu22, Debian11, 
-#   or Debian10). 
+#   and Debian 11/12) . So we should know if the distro is Ubuntu20, Ubuntu22, Debian12, Debian11, 
+#   or Debian10. 
 
-supported_releases = ["Ubuntu20.04", "Ubuntu22.04", "Debian GNU/Linux10", "Debian GNU/Linux11"]
+supported_releases = ["Ubuntu20.04", "Ubuntu22.04", "Debian GNU/Linux10", "Debian GNU/Linux11", "Debian GNU/Linux12"]
 
 
 # Clear all parameters
@@ -816,7 +816,7 @@ if not (("Ubuntu" in version) or ("Debian" in version)):
    print("This program runs on Debian or Ubuntu only, exiting!")
    exit(13)
 
-# Check releases other than Ubuntu 20.04, 22.04, and Debian 10, 11
+# Check releases other than Ubuntu 20.04, 22.04, and Debian 10, 11, 12
 
 distro, release = distro_version()
 distro_release = distro + release
@@ -854,9 +854,9 @@ http_conf2_file = "/etc/apache2/sites-available/" + hostname + "-http.conf"
 # This site includes, roundcube, adminer, rspamd and ispmailadmin interfaces
 
 # In Debian 10 and Ubuntu 20.04, roundcube runtime resides in /var/lib/roundcube
-# In Debian 11 and Ubuntu 22.04, roundcube runtime resides in /var/lib/roundcube/public_html
+# In Debian 11, 12 and Ubuntu 22.04, roundcube runtime resides in /var/lib/roundcube/public_html
 roundcube_directory = "/var/lib/roundcube"
-if (distro_release in ["Ubuntu22.04", "Debian GNU/Linux11"]):
+if (distro_release in ["Ubuntu22.04", "Debian GNU/Linux11", "Debian GNU/Linux12"]):
    roundcube_directory = "/var/lib/roundcube/public_html"
 https_conf ="""
 <VirtualHost *:443>
