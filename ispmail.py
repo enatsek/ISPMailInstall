@@ -11,7 +11,7 @@ import getpass
 """
 ISPMailInstall Utility
 Implements ISPMail Tutorial of Christoph Haas as in https://workaround.org/ispmail/buster/
-Details are in https://www.karasite.xyz or README.MD
+Details are in https://ispmailinstall.x386.org/ or README.MD
 version: 0.2.1
 
 Exit Codes:
