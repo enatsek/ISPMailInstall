@@ -42,7 +42,7 @@ def distro_version():
    other information. We try to reach the information in the following format:
    NAME="Ubuntu"
    VERSION_ID="22.04"
-   Supported distros are: Ubuntu 20.04 and 22.04, Debian GNU/Linux 10, 11 12
+   Supported distros are: Ubuntu 22.04, 24.04, Debian GNU/Linux 11, 12
    """
    d = {}
    try:
@@ -771,7 +771,7 @@ def prepare_autoconfig_files():
 #   and Debian 11/12) . So we should know if the distro is Ubuntu20, Ubuntu22, Debian12, Debian11, 
 #   or Debian10. 
 
-supported_releases = ["Ubuntu20.04", "Ubuntu22.04", "Debian GNU/Linux10", "Debian GNU/Linux11", "Debian GNU/Linux12"]
+supported_releases = ["Ubuntu22.04", "Ubuntu24.04", "Debian GNU/Linux11", "Debian GNU/Linux12"]
 
 
 # Clear all parameters
@@ -816,7 +816,7 @@ if not (("Ubuntu" in version) or ("Debian" in version)):
    print("This program runs on Debian or Ubuntu only, exiting!")
    exit(13)
 
-# Check releases other than Ubuntu 20.04, 22.04, and Debian 10, 11, 12
+# Check releases other than Ubuntu 22.04, 24.04, and Debian 11, 12
 
 distro, release = distro_version()
 distro_release = distro + release
