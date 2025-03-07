@@ -1132,7 +1132,7 @@ userdb {
 dovecot_auth_sql_conf_file = "/etc/dovecot/conf.d/auth-sql.conf.ext"
 
 # Dovecot Mailbox conf
-dovecot_10_mail_conf = """##
+dovecot_10_mail_conf = r"""
 ##
 ## Mailbox locations and namespaces
 ##
@@ -2437,7 +2437,7 @@ rspamd_local_bayes = "users_enabled = true;"
 rspamd_local_bayes_file = "/etc/rspamd/local.d/classifier-bayes.conf"
 
 # Dovecot IMAP Conf
-dovecot_20_imap_conf = """##
+dovecot_20_imap_conf = r"""##
 ## IMAP specific settings
 ##
 # If nothing happens for this long while client is IDLEing, move the connection
@@ -2561,7 +2561,7 @@ exec /usr/bin/rspamc learn_ham
 rspamd_learn_ham_file = "/etc/dovecot/sieve/rspamd-learn-ham.sh"
 
 # Dovecot Mailbox Configs
-dovecot_15_mailboxes_conf = """##
+dovecot_15_mailboxes_conf = r"""##
 ## Mailbox definitions
 ##
 # Each mailbox is specified in a separate mailbox section. The section name
