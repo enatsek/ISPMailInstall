@@ -1,6 +1,6 @@
 # ISPMailInstall
 
-- Multi Domain Mail Server Installation Tool for Debian 10, 11, 12 and Ubuntu 20.04, 22.04, 24.04 Linux
+- Multi Domain Mail Server Installation Tool for Debian 11, 12 and Ubuntu 20.04, 22.04, 24.04 Linux
 
 Totally based on ISPMail Tutorial by Christoph Haas at https://workaround.org/ispmail
 
@@ -24,7 +24,6 @@ Server must be freshly installed to guarantee working. After the full installati
 - Web based free SSL encrytpted spam management
 - Support for Thunderbird and many other mail clients.
 - All Open Source components.
-- rspamd requires a licence if you host commercial mail or filter more than 500.000 emails a day. Other that that all the software is free (as in the free beer).
 
 Everything in the tutorial is applied except following 3:
 - Blocking Malware: I decided to skip it because imho it needs a little bit too much resources.
@@ -50,7 +49,7 @@ Database Structure: - A database named mailserver will be created for domain and
 - Rspamd require a password for the web interface. (rspamdpw)
 - ISPMailAdmin requires a password for the web interface. (ispmailadminpw)
 
-- A fresh installed Debian 10 or Ubuntu 20.04 Server
+- A fresh installed Debian 11, 12 or Ubuntu 22.04, 24.04 Server
 - The hostname of the server must be in mail.example org format and both A and PTR DNS Records must be present (otherwise your mails could be considered as spam)
 - The domains to host must be decided. (example.org, example.com, example.net)
 - Python3 must be present (it is present at default Debian and Ubuntu Servers)
@@ -58,15 +57,14 @@ Database Structure: - A database named mailserver will be created for domain and
 - ispmail.py must be run by root or sudo. The script asks for the hostname, domains to host, and 5 passwords for the configuration. You may include domains and passwords in a .conf file (ispmail.conf), enter when script runs or may ask the script to generate passwords for you.
 
 -After the configuration completed, you need to make necessary DNS configurations for the hosted domains. All the necessary DNS configurations will be supplied by the script.
--For the autoconfiguration of domains, an autoconfiguration file must be uploaded to the websites of all domains. The generated autoconfiguration files will be supplied by the script.
 
 You can download ispmail.py and ispmail.conf sample configuration files at my github.
 
 - Login to ISPMailAdmin with admin username and ispmailadminpw password at https://mail.example.org/admin to create and manage mail users.
-- Login to Adminer interface with admin username and dbadminpw password at https://mail.example.org/adminer , if you need to manage the databases.
+- Login to Adminer interface with mailadmin username and mailadminpw password at https://mail.example.org/adminer , if you need to manage the databases.
 - Login to RspamD management with rspamdpw password at https://mail.example.org/rspamd if you want to view or manage rspamd.
-- All users can login to webmail interface at https://mail.example.org with their email address as username and mail password as password.
-- Users can use Thunderbird (or another mail client) to reach their mails. They may try autoconfiguration as in the following image. If that doesn’t work the full configuration info is in the second image.
+- All users can login to webmail interface at https://mail.example.org with their email address as username (user@example.org) and mail password as password.
+- Users can use Thunderbird (or another mail client) to reach their mails. 
 
 ***Remember to change all occurences of mail.example.org to your hostname
 
