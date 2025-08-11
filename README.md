@@ -1,6 +1,6 @@
-# ISPMailInstall
+# ISPMailInstall v.0.3.0
 
-- Multi Domain Mail Server Installation Tool for Debian 11, 12 and Ubuntu 20.04, 22.04, 24.04 Linux
+- Multi Domain Mail Server Installation Tool for Debian 11, 12 and Ubuntu 22.04, 24.04 Linux
 
 Totally based on ISPMail Tutorial by Christoph Haas at https://workaround.org/ispmail
 
