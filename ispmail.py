@@ -93,6 +93,7 @@ supported_releases = ["Ubuntu 22.04", "Ubuntu 24.04", "Debian GNU/Linux 11", "De
 separator = "----"
 line_separator = "----------------------------------------------------------------------------"
 
+# Today is used as a DKIM Selector
 todayt = datetime.datetime.now()
 today = todayt.strftime("%Y%m%d")
 
@@ -128,6 +129,7 @@ def get_distro_release():
             d[(key)] = val
       distro = d["NAME"]
       release = d["VERSION_ID"]
+   # No /etc/os-release file, return as Other Other
    except:
       distro = "Other"
       release = "Other"
@@ -141,6 +143,7 @@ def find_between(s, first, last):
    returns the substring of s between first and last strings
    written by: https://stackoverflow.com/users/280995/cji
    taken from: https://stackoverflow.com/questions/3368969/find-string-between-two-substrings
+   This function is used to extract DKIM key
    """
    try:
       start = s.index(first) + len(first)
@@ -192,7 +195,6 @@ def process_command(command):
    If process completes succesfully, log stdout in applog
    Otherwise log stderr in errorlog, stdout in applog
    """
-   
    # Add separator line and processing command logs
    add_log(applog, line_separator)
    add_log(applog, "Processing command --> " + command)
@@ -202,7 +204,7 @@ def process_command(command):
    # Get stdout and stderr
    out, err = proc.communicate()
    ret = proc.returncode
-   # Command ended succefully
+   # Command ended succesfully
    if ret == 0:
       add_log(applog, "Command Ended succesfully --> " + command)
       print("Command Ended succesfully --> " + command)
@@ -231,7 +233,7 @@ def process_command_wpipe(command):
    # Get stdout and stderr (stdout is empty)
    out, err = proc.communicate()
    ret = proc.returncode
-   # Command ended succefully
+   # Command ended succesfully
    if ret == 0:
       add_log(applog, "Command Ended succesfully --> " + command)
       print("Command Ended succesfully --> " + command)
@@ -407,7 +409,7 @@ def password(length):
 
 def get_parameter(message):
    """
-   Reads and returns a parameter value.
+   Reads and returns a parameter value from the user.
    Empty values are not allowed
    """
    ans = ""
@@ -419,7 +421,7 @@ def get_parameter(message):
    
 def get_password(message):
    """
-   Reads and returns a password value.
+   Reads and returns a password value from the user.
    Reads twice to make sure
    Empty values are not allowed
    """
@@ -538,6 +540,8 @@ def apt_install():
    Set parameters for postfix and roundcube, otherwise they ask for user interaction.
    Install apache, php, mariadb, postfix, rspamd, certbot, dovecot, adminer, roundcube, and dependency packages
    """
+
+   # debconf-set-selections commands are used to set default answers to apt-get questions
    commands = ["apt-get update",
    "debconf-set-selections <<< \"postfix postfix/mailname string " + hostname + "\"",
    "debconf-set-selections <<< \"postfix postfix/main_mailer_type string 'Internet Site'\"",
@@ -597,7 +601,7 @@ def configure_apache():
    process_command("a2ensite " + hostname + "-http")
    process_command("systemctl reload apache2")
 
-   # Get TLS certificates
+   # Get TLS certificates from Let's Encrypt using certbot
    command = "sudo certbot certonly -n --webroot --webroot-path /var/www/" + hostname + " \\\n"
    command = command + "-d " + hostname + " --agree-tos --email " + email
    process_command(command)
@@ -684,6 +688,7 @@ CREATE TABLE IF NOT EXISTS `virtual_aliases` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 """
 
+   # Create domain records
    for domain in domains:
       db_script += "INSERT INTO virtual_domains (name) VALUES ('" + domain +"');\n"
 
@@ -701,6 +706,7 @@ def postfix_mariadb_connection():
    Necessary configurations to connect Postfix to Mariadb
    Postfix authenticates using the tables in Mariadb
    """
+
    # Connect domains
    # Create a new config file and add a postfix config
    config_file = "/etc/postfix/mysql-virtual-mailbox-domains.cf"
@@ -802,6 +808,7 @@ def dovecot_setup():
    source = "ssl = yes"
    target = "ssl = required"
    replace_in_file(filename, source, target)
+
    source = """ssl_cert = </etc/dovecot/private/dovecot.pem
 ssl_key = </etc/dovecot/private/dovecot.key"""
    target = """ssl_cert = </etc/letsencrypt/live/mail.example.org/fullchain.pem
@@ -1036,7 +1043,6 @@ def send_mails_to_postfix():
    """
 
    # Make Postfix use Dovecot for authentication
-
    command = "postconf smtpd_sasl_type=dovecot"
    process_command(command)
    command = "postconf smtpd_sasl_path=private/auth"
@@ -1045,7 +1051,6 @@ def send_mails_to_postfix():
    process_command(command)
 
    # Enable encryption
-
    command = "postconf smtpd_tls_security_level=may"
    process_command(command)
    command = "postconf smtpd_tls_auth_only=yes"
@@ -1198,7 +1203,7 @@ users_enabled = true;"""
    # Add plugin
    filename = "/etc/dovecot/conf.d/20-imap.conf"
    source = "  #mail_plugins = $mail_plugins"
-   target = "  mail_plugins = $mail_plugins quota imap_sieve"
+   target = "  mail_plugins = $mail_plugins quota imap_sieve imap_quota"
    replace_in_file(filename, source, target)
    # Enable plugins
    filename = "/etc/dovecot/conf.d/90-sieve.conf"
