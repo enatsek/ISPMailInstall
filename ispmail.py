@@ -993,6 +993,10 @@ def roundcube_configuration():
 ];"""
    replace_in_file(filename, source, target)   # Target is the same as the previous one
 
+   # One more line to add to the end of the file
+   content = "$config['quota_zero_as_unlimited'] = true;"
+   append_file(filename, content)
+
    # Configure password plugin
    filename = "/etc/roundcube/plugins/password/config.inc.php"
    if distro_release == "Debian GNU/Linux 11":
