@@ -1,6 +1,6 @@
 # ISPMailInstall v.0.3.0
 
-- Multi Domain Mail Server Installation Tool for Debian 11, 12 and Ubuntu 22.04, 24.04 Linux
+- Multi Domain Mail Server Installation Tool for Debian 12, 13 and Ubuntu 22.04, 24.04 Linux
 
 Totally based on ISPMail Tutorial by Christoph Haas at https://workaround.org/ispmail
 
@@ -49,7 +49,7 @@ Database Structure: - A database named mailserver will be created for domain and
 - Rspamd require a password for the web interface. (rspamdpw)
 - ISPMailAdmin requires a password for the web interface. (ispmailadminpw)
 
-- A fresh installed Debian 11, 12 or Ubuntu 22.04, 24.04 Server
+- A fresh installed Debian 12, 13 or Ubuntu 22.04, 24.04 Server
 - The hostname of the server must be in mail.example org format and both A and PTR DNS Records must be present (otherwise your mails could be considered as spam)
 - The domains to host must be decided. (example.org, example.com, example.net)
 - Python3 must be present (it is present at default Debian and Ubuntu Servers)

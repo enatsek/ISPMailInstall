@@ -15,18 +15,16 @@ import getpass
 ISPMailInstall Utility
 Implements ISPMail Tutorial of Christoph Haas as in https://workaround.org
 Details are in https://ispmailinstall.x386.org/ or README.MD
-version: 0.3.0
+version: 0.3.1
 
-Aimed target versions are Debian 11/12 and Ubuntu 22.04/24.04. Program refuse to run if you don't have Debian or Ubuntu.
+Aimed target versions are Debian 11/12/13 and Ubuntu 22.04/24.04. Program refuse to run if you don't have Debian or Ubuntu.
   If you have other versions, it will warn you but will let you to take your chance. Success is not guaranteed.
   This program is tested thoroughly on fresh installed servers. I don't know if it is absolutely necessary but you are 
   advised to do so too.
 
-Debian upgrades Dovecot from 2.3 to 2.4 on version 13. So it is certain that this program will not work on Debian 13
-  when it is released. I'm going to update it as soon as Dear Christoph Haas updates it in https://workaround.org.
-
-In Christoph Haas's site https://workaround.org there are ansible scripts, you can use them to install ISPMail too. Linux
-  community loves alternatives, so I decided to keep this program too.
+Debian upgraded Dovecot from 2.3 to 2.4 on version 13. The new Dovecot version has plenty of structural changes. 
+  So I had to write some different functions for it. I believe it will work on Ubuntu 26.04 too, but we'll see it 
+  when it is released. 
 
 I started writing this program in 2019, with every version I tried to patch it. But I guess it is time to rewrite it.
 
@@ -89,7 +87,9 @@ passwordfile = "ispmailpasswords.txt"
 distro = ""
 release = ""
 distro_release = ""
-supported_releases = ["Ubuntu 22.04", "Ubuntu 24.04", "Debian GNU/Linux 11", "Debian GNU/Linux 12"]
+supported_releases = ["Ubuntu 24.04", "Ubuntu 26.04", "Debian GNU/Linux 12", "Debian GNU/Linux 13"]
+# new_releases have the new Dovecot version 2.4.x
+new_releases = ["Debian GNU/Linux 13", "Ubuntu 26.04"]
 separator = "----"
 line_separator = "----------------------------------------------------------------------------"
 
@@ -549,8 +549,12 @@ def apt_install():
    "debconf-set-selections <<< \"roundcube roundcube/database-type string mysql\"",
    "debconf-set-selections <<< \"roundcube roundcube/mysql/app-pass password\"",
    "apt-get -qq install apache2",
+   "apt-get -qq install libapache2-mod-php",
    "apt-get -qq install php",
    "apt-get -qq install php-bcmath",
+   "apt-get -qq install php-intl",  
+   "apt-get -qq install php-mbstring", 
+   "apt-get -qq install php-xml", 
    "apt-get -qq install mariadb-server",
    "apt-get -qq install postfix",
    "apt-get -qq install postfix-mysql",
@@ -558,10 +562,9 @@ def apt_install():
    "apt-get -qq install redis-server",
    "apt-get -qq install certbot",
    "apt-get -qq install dovecot-mysql",
-   "apt-get -qq install dovecot-pop3d",
    "apt-get -qq install dovecot-imapd",
-   "apt-get -qq install dovecot-managesieved",
    "apt-get -qq install dovecot-lmtpd",
+   "apt-get -qq install dovecot-managesieved",
    "apt-get -qq install adminer",
    "apt-get -qq install ca-certificates",
    "apt-get -qq install roundcube",
@@ -755,6 +758,122 @@ query = SELECT destination FROM virtual_aliases WHERE source='%s'"""
    return()
 
 # STEP 5: Dovecot Setup
+def dovecot_setup_13():
+   """
+   Dovecot configuration for Debian 13
+   """
+
+   # Create a new system user that will own all virtual mailboxes
+   command = "groupadd --system vmail"
+   process_command(command)
+   command = "useradd --system --gid vmail vmail"
+   process_command(command)
+   command = "mkdir -p /var/vmail"
+   process_command(command)
+   command = "chown -R vmail:vmail /var/vmail"
+   process_command(command)
+   command = "chmod u=rwx,g=rx,o= /var/vmail"
+   process_command(command)
+
+   # Modify /etc/dovecot/conf.d/10-auth.conf
+   filename = "/etc/dovecot/conf.d/10-auth.conf"
+   source = "!include auth-system.conf.ext"
+   target = "#!include auth-system.conf.ext"
+   replace_in_file(filename, source, target)
+   source = "#!include auth-sql.conf.ext"
+   target = "!include auth-sql.conf.ext"
+   replace_in_file(filename, source, target)
+
+   # Create a new config file and add a dovecot config
+   config_file = "/etc/dovecot/conf.d/99-ispmail-mail.conf"
+   config_contents = """mail_driver = maildir
+mail_home = /var/vmail/%{user | domain}/%{user | username}
+mail_path = ~/Maildir
+mail_uid = vmail
+mail_gid = vmail
+mail_inbox_path = ~/Maildir/"""
+   to_file(config_file, config_contents)
+
+   # Create a new config file and add a dovecot config
+   config_file = "/etc/dovecot/conf.d/99-ispmail-master.conf"
+   config_contents = """service auth {
+  unix_listener /var/spool/postfix/private/dovecot-auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+"""
+   to_file(config_file, config_contents)
+
+
+   # Create a new config file and add a dovecot config
+   config_file = "/etc/dovecot/conf.d/99-ispmail-ssl.conf"
+   config_contents = """ssl = required
+ssl_server_cert_file = /etc/letsencrypt/live/mail.example.org/fullchain.pem
+ssl_server_key_file = /etc/letsencrypt/live/mail.example.org/privkey.pem"""
+   config_contents = replace_in_string(config_contents, "mail.example.org", hostname)
+   to_file(config_file, config_contents)
+
+   # Create a new config file and add a dovecot config
+   config_file = "/etc/dovecot/conf.d/99-ispmail-lmtp-username-format.conf"
+   config_contents = """protocol lmtp {
+  auth_username_format =
+}"""
+   to_file(config_file, config_contents)
+
+   # Create a new config file and add a dovecot config
+   config_file = "/etc/dovecot/conf.d/auth-sql.conf.ext"
+   config_contents = """
+sql_driver = mysql
+
+mysql /var/run/mysqld/mysqld.sock {
+  user = mailserver
+  password = 'mailserverpw'
+  dbname = mailserver
+  host = 127.0.0.1
+}
+userdb sql {
+  query = SELECT email as user, concat(quota, 'B') AS quota_storage_size FROM virtual_users WHERE email='%{user}'
+  iterate_query = SELECT email as user FROM virtual_users
+}
+passdb sql {
+  query = SELECT password FROM virtual_users where email='%{user}'
+}"""
+   config_contents = replace_in_string(config_contents, "mailserverpw", mailserverpw)
+   append_file(config_file, config_contents)
+
+   # Fix ownerships and permissions
+   command = "chown root:dovecot /etc/dovecot/conf.d/auth-sql.conf.ext"
+   process_command(command)
+   command = "chmod o= /etc/dovecot/conf.d/auth-sql.conf.ext"
+   process_command(command)
+
+   # Create a new config file and add a dovecot config
+   config_file = "/etc/dovecot/conf.d/99-ispmail-managesieve.conf"
+   config_contents = """
+service managesieve-login {
+  # Listen only on localhost
+  inet_listener sieve {
+    listen= 127.0.0.1
+    port = 4190
+  }
+  # Disable the deprecated listener
+  inet_listener sieve_deprecated {
+    port = 0
+  }
+}
+"""
+   to_file(config_file, config_contents)
+
+   # Restart dovecot
+   #command = "systemctl restart dovecot"
+   #process_command(command)
+
+
+   return()
+
+
 
 def dovecot_setup():
    """
@@ -851,6 +970,36 @@ iterate_query = SELECT email AS user FROM virtual_users"""
 
 # STEP 6: Postfix - Dovecot Connection
 
+def postfix_dovecot_connection_13():
+   """
+   Configurations for connecting postfix to dovecot Debian 13
+   Postfix sends to dovecot, dovecot listens from postfix
+   """
+
+   # Create a new config file and add a dovecot config
+   config_file = "/etc/dovecot/conf.d/99-ispmail-lmtp-listener.conf"
+   config_contents = """service lmtp {
+  # Used internally by Dovecot
+  unix_listener lmtp {
+  }
+
+  # Listen to LMTP connections from Postfix
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}"""
+   to_file(config_file, config_contents)
+
+   # Restart dovecot, config Postfix
+   command = "systemctl restart dovecot"
+   process_command(command)
+   command = "postconf virtual_transport=lmtp:unix:private/dovecot-lmtp"
+   process_command(command)
+
+   return()
+
 def postfix_dovecot_connection():
    """
    Configurations for connecting postfix to dovecot
@@ -882,6 +1031,104 @@ def postfix_dovecot_connection():
    return(0)
 
 # STEP 7: Quota Configuration
+def configure_quotas_13():
+   """
+   Configure quotas and quota warnings
+   """
+   # Dovecot Quota Policy Service
+   filename = "/etc/dovecot/conf.d/99-ispmail-quota.conf"
+   content = """mail_plugins {
+  quota = yes
+}
+
+quota "User quota" {
+  storage_grace = 0
+
+  warning warn-95 {
+    quota_storage_percentage = 95
+    execute quota-warning {
+      args = 95 %{user}
+    }
+  }
+
+  warning warn-80 {
+    quota_storage_percentage = 80
+    execute quota-warning {
+      args = 80 %{user}
+    }
+  }
+}
+
+service quota-status {
+  executable = quota-status -p postfix
+  inet_listener quota-status {
+    port = 13373
+  }
+  client_limit = 1
+}
+
+# Example quota-warning service. The unix listener's permissions should be
+# set in a way that mail processes can connect to it. Below example assumes
+# that mail processes run as vmail user. If you use mode=0666, all system users
+# can generate quota warnings to anyone.
+service quota-warning {
+  executable = script /usr/local/bin/ispmail-quota-warning.sh
+  #user = dovecot
+  unix_listener quota-warning {
+    user = vmail
+    group = vmail
+    mode = 0666
+  }
+}
+
+##
+## Quota backends
+##
+
+# Multiple backends are supported:
+#   count: Default and recommended, quota driver tracks the quota internally within Dovecot's index files.
+#   maildir: Maildir++ quota
+#   fs: Read-only support for filesystem quota
+#quota "User quota" {
+#  driver = count
+#}
+"""
+   to_file(filename, content)
+
+   # Enable postfix recipient restrictions
+   command = '''postconf smtpd_recipient_restrictions=reject_unauth_destination, \
+    "check_policy_service=unix:private/quota-status"'''
+   process_command(command)
+
+   # Quota warning script
+   filename = "/usr/local/bin/ispmail-quota-warning.sh"
+   content = """#!/bin/sh
+PERCENT=$1
+USER=$2
+cat << EOF | /usr/lib/dovecot/dovecot-lda -d $USER -o quota_enforce=no
+Subject: Quota warning - $PERCENT% reached
+From: postmaster@mail.example.org
+
+Your mailbox can only store a limited amount of emails.
+Currently it is $PERCENT% full. If you reach 100% then
+new emails cannot be stored. Thanks for your understanding.
+EOF
+"""
+   content = replace_in_string(content, "mail.example.org", hostname)
+   to_file(filename, content)
+
+   # Make the script executable and restart Dovecot & Postfix
+   command = "chmod +x /usr/local/bin/ispmail-quota-warning.sh"
+   process_command(command)
+   command = "systemctl restart dovecot"
+   process_command(command)
+   command = "systemctl restart postfix"
+   process_command(command)
+
+   return()
+
+
+
 def configure_quotas():
    """
    Configure quotas and quota warnings
@@ -937,6 +1184,7 @@ Your mailbox can only store a limited amount of emails.
 Currently it is $PERCENT% full. If you reach 100% then
 new emails cannot be stored. Thanks for your understanding.
 EOF"""
+   content = replace_in_string(content, "mail.example.org", hostname)
    to_file(filename, content)
 
    # Make the script executable and restart Dovecot & Postfix
@@ -1040,6 +1288,91 @@ $config['managesieve_host'] = 'localhost';
    return()
 
 # STEP 9: Send mails to postfix
+def send_mails_to_postfix_13():
+   """
+   Configurations for forwarding outgoing mails to postfix Debian 13
+   """
+
+   # Make Postfix use Dovecot for authentication
+   command = 'postconf -M submission/inet="submission inet n - y - - smtpd"'
+   process_command(command)
+   command = 'postconf -P "submission/inet/syslog_name=postfix/submission"'
+   process_command(command)
+   command = 'postconf -P "submission/inet/smtpd_tls_security_level=encrypt"'
+   process_command(command)
+   command = 'postconf -P "submission/inet/smtpd_sasl_auth_enable=yes"'
+   process_command(command)
+   command = 'postconf -P "submission/inet/smtpd_sasl_type=dovecot"'
+   process_command(command)
+   command = 'postconf -P "submission/inet/smtpd_sasl_path=private/dovecot-auth"'
+   process_command(command)
+   command = 'postconf -P "submission/inet/smtpd_recipient_restrictions=permit_sasl_authenticated,reject"'
+   process_command(command)
+   command = 'postconf -P "submission/inet/smtpd_sender_restrictions=reject_sender_login_mismatch,permit_sasl_authenticated,reject"'
+   process_command(command)
+   command = 'postfix reload'
+   process_command(command)
+   command = 'postconf -M submissions/inet="submissions inet n - y - - smtpd"'
+   process_command(command)
+   command = 'postconf -P "submissions/inet/syslog_name=postfix/submissions"'
+   process_command(command)
+   command = 'postconf -P "submissions/inet/smtpd_tls_wrappermode=yes"'
+   process_command(command)
+   command = 'postconf -P "submissions/inet/smtpd_sasl_auth_enable=yes"'
+   process_command(command)
+   command = 'postconf -P "submissions/inet/smtpd_sasl_type=dovecot"'
+   process_command(command)
+   command = 'postconf -P "submissions/inet/smtpd_sasl_path=private/dovecot-auth"'
+   process_command(command)
+   command = 'postconf -P "submissions/inet/smtpd_recipient_restrictions=permit_sasl_authenticated,reject"'
+   process_command(command)
+   command = 'postconf -P "submissions/inet/smtpd_sender_restrictions=reject_sender_login_mismatch,permit_sasl_authenticated,reject"'
+   process_command(command)
+   command = 'postfix reload'
+   process_command(command)
+   command = 'postconf smtp_tls_security_level=encrypt'
+   process_command(command)
+   command = 'postconf smtpd_tls_security_level=encrypt'
+   process_command(command)
+   command = 'postconf smtp_tls_mandatory_protocols=">=TLSv1.2"'
+   process_command(command)
+   command = 'postconf smtpd_tls_mandatory_protocols=">=TLSv1.2"'
+   process_command(command)
+   command = 'postconf smtp_tls_mandatory_ciphers=high'
+   process_command(command)
+   command = 'postconf smtpd_tls_mandatory_ciphers=high'
+   process_command(command)
+   command = 'postconf smtpd_tls_cert_file=/etc/letsencrypt/live/mail.example.org/fullchain.pem'
+   command = replace_in_string(command, "mail.example.org", hostname)
+   process_command(command)
+   command = 'postconf smtpd_tls_key_file=/etc/letsencrypt/live/mail.example.org/privkey.pem'
+   command = replace_in_string(command, "mail.example.org", hostname)
+   process_command(command)
+   command = 'postfix reload'
+   process_command(command)
+
+   # Configure sender user maps
+   filename = "/etc/postfix/mysql-email2email.cf"
+   content = """user = mailserver
+password = mailserverpw
+hosts = 127.0.0.1
+dbname = mailserver
+query = SELECT email FROM virtual_users WHERE email='%s'"""
+   content = replace_in_string(content, "mailserverpw", mailserverpw)
+   to_file(filename, content)
+
+   # Configure permissions add the configuration to postfix and restart it
+   command = "chown root:postfix /etc/postfix/mysql-email2email.cf"
+   process_command(command)
+   command = "chmod u=rw,g=r,o= /etc/postfix/mysql-email2email.cf"   
+   process_command(command)
+   command = "postconf smtpd_sender_login_maps=mysql:/etc/postfix/mysql-email2email.cf"
+   process_command(command)
+   command = "systemctl restart postfix"
+   process_command(command)
+
+
+
 
 def send_mails_to_postfix():
    """
@@ -1105,6 +1438,210 @@ query = SELECT email FROM virtual_users WHERE email='%s'"""
 
 # STEP 10: Rspamd Configuration
 
+def rspamd_configuration_13():
+   """
+   Necessary rspamd configuration for Debian 13
+   Connect postfix to rspamd, spam headers and sending junk mail to junk folder,
+   Spam detection training, learn from user actions, rspamd web interface
+   """
+   # Make postfix use rspamd
+   command = "postconf smtpd_milters=inet:127.0.0.1:11332"
+   process_command(command)
+   command = "postconf non_smtpd_milters=inet:127.0.0.1:11332"
+   process_command(command)
+
+   # Create a custom score metrics, this will never reject a spam mail, instead put it in Junk folder
+   filename = "/etc/rspamd/local.d/actions.conf"
+   content = """reject = 150;
+add_header = 6;
+greylist = 4;"""
+   to_file(filename, content)
+
+   # Add spam headers
+   filename = "/etc/rspamd/override.d/milter_headers.conf"
+   content = "extended_spam_headers = true;"
+   to_file(filename, content)
+
+   # Restart rspamd
+   command = "systemctl restart rspamd"
+   process_command(command)
+
+   # Configure dovecot to send the spam mails to junk folder
+   filename = "/etc/dovecot/conf.d/99-ispmail-sieve-movetojunk.conf"
+   content = r"""sieve_script spam-to-junk-folder {
+  driver = file
+  type = after
+  path = /etc/dovecot/sieve/spam-to-junk-folder.sieve
+}
+# Enable the execution of Sieve rules when Postfix sends an email to Dovecot over LMTP
+protocol lmtp {
+  mail_plugins {
+    sieve = yes
+  }
+}
+# Make sure that every user has a Junk folder and is subscribed to it
+namespace inbox {
+  mailbox Junk {
+    special_use = \Junk
+    auto = subscribe
+  }
+}"""
+   to_file(filename, content)
+
+   # Restart dovecot and create sieve folders
+   command = "systemctl restart dovecot"
+   process_command(command)
+   command = "mkdir -p /etc/dovecot/sieve"
+   process_command(command)
+
+   # Sieve file, fill and compile it
+   filename = "/etc/dovecot/sieve/spam-to-junk-folder.sieve"
+   content = """ require ["fileinto"];
+if header :contains "X-Spam" "Yes" {
+ fileinto "Junk";
+ stop;
+}"""
+   to_file(filename, content)
+   command = "sievec /etc/dovecot/sieve/spam-to-junk-folder.sieve"
+   process_command(command)
+
+   # Bayes configuration and restrart rspamd
+   filename = "/etc/rspamd/local.d/classifier-bayes.conf"
+   content = """# Store training data in the Redis database
+servers = "127.0.0.1:6379";
+backend = "redis";
+
+# Enable automatic training
+autolearn = true;   # if rspamd is sure that an email is spam, it will be learned
+min_learns = 200;   # do not trust the data before at least 200 mails have been learned
+users_enabled = true;"""
+   to_file(filename, content)
+   command = "systemctl restart rspamd"
+   process_command(command)
+
+
+   # IMAP Sieve conf
+   filename = "/etc/dovecot/conf.d/99-ispmail-imapsieve.conf"
+   content = """# Enable the imap_sieve plugin
+protocol imap {
+  mail_plugins {
+    imap_sieve = yes
+    quota = yes
+    imap_quota = yes
+  }
+}
+
+# Allow the use of the pipe plugin to send mails to shell scripts
+sieve_plugins {
+  sieve_extprograms = yes
+  sieve_imapsieve = yes
+}
+
+sieve_global_extensions {
+  vnd.dovecot.pipe = yes
+}
+
+# Where to look for Sieve scripts that use the Pipe functionality
+sieve_pipe_bin_dir = /etc/dovecot/sieve
+
+# Moved into Junk? -> Learn as spam.
+mailbox Junk {
+  sieve_script spam {
+    type = before
+    cause = copy
+    path = /etc/dovecot/sieve/learn-spam.sieve
+  }
+}
+
+# Moved out of Junk? -> Learn as ham.
+imapsieve_from Junk {
+  sieve_script ham {
+    type = before
+    cause = copy
+    path = /etc/dovecot/sieve/learn-ham.sieve
+  }
+}"""
+   to_file(filename, content)
+   command = "systemctl restart dovecot"
+   process_command(command)
+
+   # Dovecot sieve files for learning ham and spam
+   filename = "/etc/dovecot/sieve/learn-spam.sieve"
+   content = """require ["vnd.dovecot.pipe", "copy", "imapsieve"];
+pipe :copy "rspamd-learn-spam.sh";"""
+   to_file(filename, content)
+   filename = "/etc/dovecot/sieve/learn-ham.sieve"
+   content = """require ["vnd.dovecot.pipe", "copy", "imapsieve", "variables"];
+pipe :copy "rspamd-learn-ham.sh";"""
+   to_file(filename, content)
+   filename = "/etc/dovecot/sieve/rspamd-learn-spam.sh"
+   content = """#!/bin/sh
+# Receives an email from Dovecot's Sieve script and pipe it into rspamc
+exec /usr/bin/rspamc learn_spam"""
+   to_file(filename, content)
+   filename = "/etc/dovecot/sieve/rspamd-learn-ham.sh"
+   content = """#!/bin/sh
+# Receives an email from Dovecot's Sieve script and pipe it into rspamc
+exec /usr/bin/rspamc learn_ham"""
+   to_file(filename, content)
+
+   # Compile sieve rules, set necessary ownerships and permissions for files
+   command = "sievec /etc/dovecot/sieve/learn-spam.sieve"
+   process_command(command)
+   command = "sievec /etc/dovecot/sieve/learn-ham.sieve"
+   process_command(command)
+   command = "chmod u=rw,go= /etc/dovecot/sieve/learn-{spam,ham}.{sieve,svbin}"
+   process_command(command)
+   command = "chown vmail:vmail /etc/dovecot/sieve/learn-{spam,ham}.{sieve,svbin}"
+   process_command(command)
+   command = "chmod u=rwx,go= /etc/dovecot/sieve/rspamd-learn-{spam,ham}.sh"
+   process_command(command)
+   command = "chown vmail:vmail /etc/dovecot/sieve/rspamd-learn-{spam,ham}.sh"
+   process_command(command)
+
+   # Autoexpunge and autosubscribed Mail Folders
+   filename = "/etc/dovecot/conf.d/99-ispmail-autoexpunge.conf"
+   content = r"""# Remove mails from the Junk and Trash folders after 30 days
+mailbox Junk {
+  special_use = \Junk
+  auto = subscribe
+  mailbox_autoexpunge = 30d
+}
+mailbox Trash {
+  special_use = \Trash
+  auto = subscribe
+  mailbox_autoexpunge = 30d
+}  
+mailbox Sent {
+    special_use = \Sent
+    auto = subscribe
+}
+
+# Make expunging more efficient
+mailbox_list_index = yes
+mail_always_cache_fields = date.save"""
+   to_file(filename, content)
+   command = "systemctl restart dovecot"
+   #process_command(command)
+
+   ## Rspamd Web Interface
+   command = "rspamadm pw -p rspamdpw > /tmp/rspamdpassword"
+   command = replace_in_string(command, "rspamdpw", rspamdpw)
+   process_command_wpipe(command)
+   filename = "/tmp/rspamdpassword"
+   ret, rspamdencpw = from_file(filename)
+   # Remove \n at the end
+   rspamdencpw = rspamdencpw[:-1]
+   command = "rm /tmp/rspamdpassword"
+   process_command(command)
+   filename = "/etc/rspamd/local.d/worker-controller.inc"
+   content = 'password = "' + rspamdencpw + '"'
+   to_file(filename, content)
+   command = "systemctl restart rspamd"
+   process_command(command)
+
+   return()
+
 def rspamd_configuration():
    """
    Necessary rspamd configuration
@@ -1119,7 +1656,6 @@ def rspamd_configuration():
    process_command(command)
    command = 'postconf milter_mail_macros="i {mail_addr} {client_addr} {client_name} {auth_authen}"'
    process_command(command)
-
 
    # Create a custom score metrics, this will never reject a spam mail, instead put it in Junk folder
    filename = "/etc/rspamd/local.d/actions.conf"
@@ -1514,12 +2050,27 @@ def main():
    configure_apache()
    db_preparation()
    postfix_mariadb_connection()
-   dovecot_setup()
-   postfix_dovecot_connection()
-   configure_quotas()
+   if distro_release in new_releases:
+      dovecot_setup_13()
+   else:
+      dovecot_setup()
+   if distro_release in new_releases:
+      postfix_dovecot_connection_13()
+   else:
+      postfix_dovecot_connection()
+   if distro_release in new_releases:
+      configure_quotas_13()
+   else:
+      configure_quotas()
    roundcube_configuration()
-   send_mails_to_postfix()
-   rspamd_configuration()
+   if distro_release in new_releases:
+      send_mails_to_postfix_13()
+   else:
+      send_mails_to_postfix()
+   if distro_release in new_releases:
+      rspamd_configuration_13()
+   else:
+      rspamd_configuration()
    dkim_configuration()
    ispmailadmin_configuration()
    finalize_installation()
