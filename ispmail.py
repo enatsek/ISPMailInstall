@@ -104,16 +104,16 @@ def get_distro_release():
    /etc/os-release file contains distro name and release numbers among
    other information. We try to reach the information in the following format:
    distro = "Ubuntu"
-   distro = "Debian GNU Linux"
+   distro = "Debian GNU/Linux"
    release = "22.04"
    release = "24.04"
    release = "11"
    release = "12"
    distro_release = "Ubuntu 22.04"
    distro_release = "Ubuntu 24.04"
-   distro_release = "Debian GNU Linux 11"
-   distro_release = "Debian GNU Linux 12"
-   Supported distros are: Ubuntu 22.04, 24.04, Debian GNU/Linux 11, 12
+   distro_release = "Debian GNU/Linux 12"
+   distro_release = "Debian GNU/Linux 13"
+   Supported distros are: Ubuntu 22.04, 24.04, Debian GNU/Linux 12, 13
    """
    d = {}
    try:
@@ -176,7 +176,7 @@ def start_log(log_file):
 
 def add_log(log_file, log):
    """
-   Adds a log to the log file
+   Adds a log with timestamp to the log file
    log_file: Name of log file
    log: log to be added
    On error exits the program with the code 22
@@ -658,7 +658,8 @@ systemctl reload dovecot"""
 
 def db_preparation():
    """
-   Run a mariadb script to create a database and add domains
+   Run a mariadb script to create the database
+   After creating tables a record is added for every domain requested
    """
 
    db_script_file = "/tmp/ispmail_mariadb.sql"
@@ -711,7 +712,7 @@ def postfix_mariadb_connection():
    """
 
    # Connect domains
-   # Create a new config file and add a postfix config
+   # Create a new config file for mapping domains
    config_file = "/etc/postfix/mysql-virtual-mailbox-domains.cf"
    config_contents = """user = mailserver
 password = mailserverpw
@@ -720,11 +721,12 @@ dbname = mailserver
 query = SELECT 1 FROM virtual_domains WHERE name='%s'"""
    config_contents = replace_in_string(config_contents, "mailserverpw", mailserverpw)
    to_file(config_file, config_contents)
+   # Add config file to Postfix
    command = "postconf virtual_mailbox_domains=mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf"
    process_command(command)
 
    # Connect users
-   # Create a new config file and add a postfix config
+   # Create a new config file for mapping users
    config_file = "/etc/postfix/mysql-virtual-mailbox-maps.cf"
    config_contents = """user = mailserver
 password = mailserverpw
@@ -733,11 +735,12 @@ dbname = mailserver
 query = SELECT 1 FROM virtual_users WHERE email='%s'"""
    config_contents = replace_in_string(config_contents, "mailserverpw", mailserverpw)
    to_file(config_file, config_contents)
+   # Add config file to Postfix
    command = "postconf virtual_mailbox_maps=mysql:/etc/postfix/mysql-virtual-mailbox-maps.cf"
    process_command(command)
 
    # Connect aliases
-   # Create a new config file and add a postfix config
+   # Create a new config file for mapping aliases
    config_file = "/etc/postfix/mysql-virtual-alias-maps.cf"
    config_contents = """user = mailserver
 password = mailserverpw
@@ -746,10 +749,11 @@ dbname = mailserver
 query = SELECT destination FROM virtual_aliases WHERE source='%s'"""
    config_contents = replace_in_string(config_contents, "mailserverpw", mailserverpw)
    to_file(config_file, config_contents)
+   # Add config file to Postfix
    command = "postconf virtual_alias_maps=mysql:/etc/postfix/mysql-virtual-alias-maps.cf"
    process_command(command)
 
-   # Fix ownerships & permissions
+   # Fix ownerships & permissions, Files contain database password
    command = "chgrp postfix /etc/postfix/mysql-*.cf"
    process_command(command)
    command = "chmod u=rw,g=r,o= /etc/postfix/mysql-*.cf"
@@ -761,6 +765,7 @@ query = SELECT destination FROM virtual_aliases WHERE source='%s'"""
 def dovecot_setup_13():
    """
    Dovecot configuration for Debian 13
+   As Debian 13 have a new version of Dovecot (2.4.x), it needs different configurations
    """
 
    # Create a new system user that will own all virtual mailboxes
@@ -776,6 +781,7 @@ def dovecot_setup_13():
    process_command(command)
 
    # Modify /etc/dovecot/conf.d/10-auth.conf
+   # Disable system users having mailboxes and allow SQL configuration for users
    filename = "/etc/dovecot/conf.d/10-auth.conf"
    source = "!include auth-system.conf.ext"
    target = "#!include auth-system.conf.ext"
@@ -785,6 +791,7 @@ def dovecot_setup_13():
    replace_in_file(filename, source, target)
 
    # Create a new config file and add a dovecot config
+   # Define locations for mailboxes
    config_file = "/etc/dovecot/conf.d/99-ispmail-mail.conf"
    config_contents = """mail_driver = maildir
 mail_home = /var/vmail/%{user | domain}/%{user | username}
@@ -795,6 +802,7 @@ mail_inbox_path = ~/Maildir/"""
    to_file(config_file, config_contents)
 
    # Create a new config file and add a dovecot config
+   # Activate a connection for accepting mails from Postfix
    config_file = "/etc/dovecot/conf.d/99-ispmail-master.conf"
    config_contents = """service auth {
   unix_listener /var/spool/postfix/private/dovecot-auth {
@@ -808,6 +816,7 @@ mail_inbox_path = ~/Maildir/"""
 
 
    # Create a new config file and add a dovecot config
+   # Define the paths for SSL Certificates
    config_file = "/etc/dovecot/conf.d/99-ispmail-ssl.conf"
    config_contents = """ssl = required
 ssl_server_cert_file = /etc/letsencrypt/live/mail.example.org/fullchain.pem
@@ -816,6 +825,7 @@ ssl_server_key_file = /etc/letsencrypt/live/mail.example.org/privkey.pem"""
    to_file(config_file, config_contents)
 
    # Create a new config file and add a dovecot config
+   # Clear default lmtp username format
    config_file = "/etc/dovecot/conf.d/99-ispmail-lmtp-username-format.conf"
    config_contents = """protocol lmtp {
   auth_username_format =
@@ -823,6 +833,7 @@ ssl_server_key_file = /etc/letsencrypt/live/mail.example.org/privkey.pem"""
    to_file(config_file, config_contents)
 
    # Create a new config file and add a dovecot config
+   # Tell Dovecot how to get user information (email, quota, password) from database
    config_file = "/etc/dovecot/conf.d/auth-sql.conf.ext"
    config_contents = """
 sql_driver = mysql
@@ -843,13 +854,15 @@ passdb sql {
    config_contents = replace_in_string(config_contents, "mailserverpw", mailserverpw)
    append_file(config_file, config_contents)
 
-   # Fix ownerships and permissions
+   # Fix ownerships and permissions, File has database password
    command = "chown root:dovecot /etc/dovecot/conf.d/auth-sql.conf.ext"
    process_command(command)
    command = "chmod o= /etc/dovecot/conf.d/auth-sql.conf.ext"
    process_command(command)
 
    # Create a new config file and add a dovecot config
+   # Manage sieve configuration, I really don't know what it is
+   # But Christoph says it is necessary
    config_file = "/etc/dovecot/conf.d/99-ispmail-managesieve.conf"
    config_contents = """
 service managesieve-login {
@@ -977,6 +990,7 @@ def postfix_dovecot_connection_13():
    """
 
    # Create a new config file and add a dovecot config
+   # Configuration is needed for Postfix to send incoming mails to Dovecot
    config_file = "/etc/dovecot/conf.d/99-ispmail-lmtp-listener.conf"
    config_contents = """service lmtp {
   # Used internally by Dovecot
@@ -1033,7 +1047,7 @@ def postfix_dovecot_connection():
 # STEP 7: Quota Configuration
 def configure_quotas_13():
    """
-   Configure quotas and quota warnings
+   Configure quotas and quota warnings For Debian 13
    """
    # Dovecot Quota Policy Service
    filename = "/etc/dovecot/conf.d/99-ispmail-quota.conf"
