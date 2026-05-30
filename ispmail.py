@@ -15,16 +15,14 @@ import getpass
 ISPMailInstall Utility
 Implements ISPMail Tutorial of Christoph Haas as in https://workaround.org
 Details are in https://ispmailinstall.x386.org/ or README.MD
-version: 0.3.1
+version: 0.3.2
 
-Aimed target versions are Debian 11/12/13 and Ubuntu 22.04/24.04. Program refuse to run if you don't have Debian or Ubuntu.
+Aimed target versions are Debian 11/12/13 and Ubuntu 22.04/24.04/26.04. Program refuse to run if you don't have Debian or Ubuntu.
   If you have other versions, it will warn you but will let you to take your chance. Success is not guaranteed.
   This program is tested thoroughly on fresh installed servers. I don't know if it is absolutely necessary but you are 
   advised to do so too.
 
-Debian upgraded Dovecot from 2.3 to 2.4 on version 13. The new Dovecot version has plenty of structural changes. 
-  So I had to write some different functions for it. I believe it will work on Ubuntu 26.04 too, but we'll see it 
-  when it is released. 
+Debian upgraded Dovecot from 2.3 to 2.4 on version 13. The new Dovecot version has plenty of structural changes. The same is true with Ubuntu 26.04.
 
 I started writing this program in 2019, with every version I tried to patch it. But I guess it is time to rewrite it.
 
@@ -548,6 +546,7 @@ def apt_install():
    "debconf-set-selections <<< \"roundcube roundcube/dbconfig-install boolean true\"",
    "debconf-set-selections <<< \"roundcube roundcube/database-type string mysql\"",
    "debconf-set-selections <<< \"roundcube roundcube/mysql/app-pass password\"",
+   "debconf-set-selections <<< \"roundcube roundcube/mysql/admin-pass password\"",
    "apt-get -qq install apache2",
    "apt-get -qq install libapache2-mod-php",
    "apt-get -qq install php",
