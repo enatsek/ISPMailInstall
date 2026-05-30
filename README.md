@@ -1,4 +1,4 @@
-# ISPMailInstall v.0.3.0
+# ISPMailInstall v.0.3.2
 
 - Multi Domain Mail Server Installation Tool for Debian 12, 13 and Ubuntu 24.04, 26.04 Linux
 
