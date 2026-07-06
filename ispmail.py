@@ -24,7 +24,7 @@ Aimed target versions are Debian 11/12/13 and Ubuntu 22.04/24.04/26.04. Program 
 
 Debian upgraded Dovecot from 2.3 to 2.4 on version 13. The new Dovecot version has plenty of structural changes. The same is true with Ubuntu 26.04.
 
-I started writing this program in 2019, with every version I tried to patch it. But I guess it is time to rewrite it.
+Ubuntu 26.04 has some problems with Roundcube and PHP8.5, so we have to update /usr/share/roundcube/program/lib/Roundcube/bootstrap.php file for Ubuntu 26.04.
 
 You are free to use, change, modify (whatever you want) with this program. But if you want to change and produce a product 
   using it, you have to supply the source code. That is what GPL says. 
@@ -1297,6 +1297,32 @@ $config['password_query'] = "UPDATE virtual_users SET password=%P WHERE email=%u
 $config['managesieve_host'] = 'localhost';
 ?>"""
    to_file(filename, content)
+
+   # Ubuntu 26.04 /usr/share/roundcube/program/lib/Roundcube/bootstrap.php file patch
+   if distro_release == "Ubuntu 26.04":
+      source = """function array_first($array)
+{
+    if (is_array($array)) {
+        reset($array);
+        foreach ($array as $element) {
+            return $element;
+        }
+    }
+}"""
+
+      target = """if (!function_exists('array_first')) {
+    function array_first($array) {
+	if (is_array($array)) {
+        	reset($array);
+        	foreach ($array as $element) {
+        	    return $element;
+        	}
+    	}
+    }
+}"""
+
+      filename = "/usr/share/roundcube/program/lib/Roundcube/bootstrap.php"
+      replace_in_file(filename, source, target)
 
    return()
 
