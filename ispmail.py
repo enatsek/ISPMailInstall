@@ -1260,6 +1260,7 @@ def roundcube_configuration():
 
    # Configure password plugin
    filename = "/etc/roundcube/plugins/password/config.inc.php"
+   distro, release, distro_release = get_distro_release()
    if distro_release == "Debian GNU/Linux 11":
       content = """<?php
 $config['password_driver'] = 'sql';
